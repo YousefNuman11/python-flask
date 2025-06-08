@@ -4,26 +4,36 @@ import os
 import pickle
 
 known_faces = {}
-folder = "known_faces"
+base_folder = "known_faces"
 
-for filename in os.listdir(folder):
-    if filename.endswith(".jpg") or filename.endswith(".png"):
-        student_id = os.path.splitext(filename)[0]
-        image_path = os.path.join(folder, filename)
+for student_id in os.listdir(base_folder):
+    student_folder = os.path.join(base_folder, student_id)
 
-        print(f"Processing: {filename}")
-        image = face_recognition.load_image_file(image_path)
-        encodings = face_recognition.face_encodings(image)
+    if not os.path.isdir(student_folder):
+        continue  # skip files, we only want directories
 
-        if encodings:
-            known_faces[student_id] = encodings[0]
-            print(f"[+] Encoded {student_id}")
-        else:
-            print(f"[!] No face found in {filename}")
+    encodings = []
+
+    for filename in os.listdir(student_folder):
+        if filename.lower().endswith(('.jpg', '.png')):
+            image_path = os.path.join(student_folder, filename)
+            print(f"Processing: {student_id}/{filename}")
+
+            image = face_recognition.load_image_file(image_path)
+            face_encs = face_recognition.face_encodings(image)
+
+            if face_encs:
+                encodings.append(face_encs[0])
+                print(f"[+] Encoded {filename}")
+            else:
+                print(f"[!] No face found in {filename}")
+
+    if encodings:
+        known_faces[student_id] = encodings
+        print(f"[✅] {student_id}: {len(encodings)} encodings saved")
 
 # Save to known_faces/encodings.pkl
 with open("known_faces/encodings.pkl", "wb") as f:
     pickle.dump(known_faces, f)
-
 
 print("✅ All encodings saved to known_faces/encodings.pkl")
