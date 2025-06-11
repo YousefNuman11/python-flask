@@ -27,8 +27,13 @@ def verify_face():
     try:
         data = request.json
         img_data = data.get('image')
-        if not img_data:
-            return jsonify({"status": "fail", "message": "No image provided"}), 400
+        student_id = data.get('student_id')
+
+        if not img_data or not student_id:
+            return jsonify({"status": "fail", "message": "Missing image or student_id"}), 400
+
+        if student_id not in known_faces:
+            return jsonify({"status": "fail", "message": f"No encodings found for student_id '{student_id}'"}), 404
 
         img_bytes = base64.b64decode(img_data)
         image = face_recognition.load_image_file(io.BytesIO(img_bytes))
@@ -39,37 +44,31 @@ def verify_face():
 
         unknown_encoding = unknown_encodings[0]
 
-        best_match_id = None
-        best_similarity = 0
-        best_distance = None
+        # Compare only with the specific student's encodings
+        student_encodings = known_faces[student_id]
+        distances = face_recognition.face_distance(student_encodings, unknown_encoding)
+        min_distance = np.min(distances)
+        similarity = face_similarity(min_distance)
 
-        for student_id, encodings in known_faces.items():
-            distances = face_recognition.face_distance(encodings, unknown_encoding)
-            min_distance = np.min(distances)
-            similarity = face_similarity(min_distance)
-
-            if similarity > best_similarity:
-                best_similarity = similarity
-                best_match_id = student_id
-                best_distance = min_distance
-
-        if best_similarity >= 80:
+        if similarity >= 80:
             return jsonify({
                 "status": "success",
-                "student_id": best_match_id,
-                "similarity": round(best_similarity, 2),
-                "distance": round(best_distance, 4)
+                "student_id": student_id,
+                "similarity": round(similarity, 2),
+                "distance": round(min_distance, 4)
             }), 200
         else:
             return jsonify({
                 "status": "fail",
                 "message": "Face not recognized with sufficient confidence",
-                "highest_similarity": round(best_similarity, 2),
-                "closest_distance": round(best_distance, 4) if best_distance else None
+                "student_id": student_id,
+                "similarity": round(similarity, 2),
+                "distance": round(min_distance, 4)
             }), 403
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/train-face', methods=['POST'])
 def train_face():
