@@ -19,7 +19,7 @@ else:
 
 # Convert distance to similarity
 def face_similarity(distance):
-    similarity = max(0, min(1, 1 - (distance / 0.7)))
+    similarity = max(0, min(1, 1 - (distance / 0.6)))
     return similarity * 100
 
 @app.route('/verify-face', methods=['POST'])
@@ -50,13 +50,22 @@ def verify_face():
         min_distance = np.min(distances)
         similarity = face_similarity(min_distance)
 
-        if similarity >= 80:
+        if similarity >= 60:
+            # Add the new verified encoding to improve recognition
+            known_faces[student_id].append(unknown_encoding)
+
+            # Save the updated encodings
+            with open(ENCODINGS_FILE, "wb") as f:
+                pickle.dump(known_faces, f)
+
             return jsonify({
                 "status": "success",
                 "student_id": student_id,
                 "similarity": round(similarity, 2),
-                "distance": round(min_distance, 4)
+                "distance": round(min_distance, 4),
+                "message": "Face verified and encoding updated for learning"
             }), 200
+
         else:
             return jsonify({
                 "status": "fail",
